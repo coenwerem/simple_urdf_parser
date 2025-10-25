@@ -115,10 +115,6 @@ python3 examples/demo_parse_urdf.py
 Sample output:
 
 ```
-Got description file of type URDF with tag: robot:ur3_robot.
-Mesh geom parsing broken due to pycollada deprecation. Using default proxy box.
-Do not use this for collision geometry in practice!
-
 Links:
 ['base_link', 'base_link_inertia', 'shoulder_link', 'upper_arm_link', 'forearm_link',
  'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'base', 'flange', 'tool0']
@@ -153,7 +149,7 @@ simple_urdf_parser/
 
 ## Notes
 
-* The current implementation uses proxy boxes for mesh geometry due to deprecation of PyCollada. Avoid using it for collision-sensitive computations.
+* The current implementation uses proxy boxes for mesh geometry due to deprecation of PyCollada. Avoid using it for collision-sensitive computations that rely on meshes.
 * Designed for Python >= 3.9.
 * Intended as a lightweight utility for robotics projects, simulation, and education.
 

@@ -30,6 +30,24 @@ import spatialmath as sm
 import numpy as np
 from numpy.typing import NDArray
 import trimesh
+import warnings
+
+_WARNINGS_SUPPRESSED = True
+
+# Override default warning format
+def simple_formatwarning(message, category, filename, lineno, line=None):
+    return f"{message}\n"
+
+warnings.formatwarning = simple_formatwarning
+
+def suppress_warnings(enable=True):
+    """Globally suppress all library warnings."""
+    global _WARNINGS_SUPPRESSED
+    _WARNINGS_SUPPRESSED = enable
+    if enable:
+        warnings.simplefilter("ignore", category=UserWarning)
+    else:
+        warnings.simplefilter("default", category=UserWarning)
 
 class Origin:
     def __init__(self, rot_euler: List, translation: List):
@@ -74,9 +92,13 @@ class Geometry:
 
             elif geom_type == "mesh":
                 # create a reasonable default box if mesh parsing fails
-                if not hasattr(Geometry, "_mesh_warning_printed"):
-                    print("Mesh geom parsing broken due to pycollada deprecation. Using default proxy box. \n"
-                          "Do not use this for collision geometry in practice!")
+                if not hasattr(Geometry, "_mesh_warning_printed") and not _WARNINGS_SUPPRESSED:
+                    warnings.warn(
+                        "Mesh geom parsing broken due to pycollada deprecation. Using default proxy box.\n"
+                        "Do not use this for collision geometry in practice!",
+                        UserWarning,
+                        stacklevel=2
+                    )
                     Geometry._mesh_warning_printed = True
                 # use provided scale to make the fallback more sensible
                 if geom_vals and len(geom_vals) >= 3:

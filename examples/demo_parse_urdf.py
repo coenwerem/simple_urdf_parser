@@ -3,7 +3,7 @@
 from simple_urdf_parser.parser import Robot
 import numpy as np
 import spatialmath as sm
-np.random.seed(42)
+np.random.seed(42) # reproducibility
 
 def main():
     # Get URDF from file and construct a Robot object
