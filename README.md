@@ -8,7 +8,7 @@ A lightweight Python library for parsing, analyzing, and manipulating robot desc
 - Load and parse URDF robot description files.
 - Access link and joint names, origins (RPY + XYZ), and hierarchy.
 - Forward kinematics (FK) computation.
-- Inverse kinematics (IK) with initial guess and iterative solvers.
+- Inverse kinematics (IK) with Jacobian pseudoinverse and Damped Least Squares iterative solvers.
 - Jacobian computation for configurations.
 - Singular configuration detection.
 - Generate random joint configurations respecting joint limits.
