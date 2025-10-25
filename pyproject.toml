@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simple_urdf_parser"
+version = "0.1.0"
+description = "A lightweight Python library for parsing and analyzing URDF files."
+authors = [{ name = "Clinton Enwerem" }]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+dependencies = [
+    "numpy==1.26.4",
+    "spatialmath-python==1.1.14",
+    "trimesh==4.7.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/coenwerem/simple_urdf_parser"
+Issues = "https://github.com/coenwerem/simple_urdf_parser/issues"
+
+[tool.setuptools.packages.find]
+include = ["simple_urdf_parser*"]
