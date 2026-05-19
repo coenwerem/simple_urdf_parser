@@ -20,4 +20,9 @@ except Exception as _ex:
 		"Make sure you run tests from the project root or install the package (e.g. `pip install -e .`) "
 		"and that package dependencies are installed.") from _ex
 
-__all__ = ["Robot"]
+try:
+	from .visualizer import RobotVisualizer  # noqa: F401
+except ImportError:
+	RobotVisualizer = None
+
+__all__ = ["Robot", "RobotVisualizer"]
