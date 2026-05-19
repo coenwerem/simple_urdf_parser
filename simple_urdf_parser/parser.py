@@ -71,6 +71,7 @@ class Geometry:
                  num_points: int = 0,
                  fit_type: str = "cylinder") -> None:
         self.geom_type = geom_type
+        self.mesh_dir = mesh_dir
         self.geometry = None
 
         try:

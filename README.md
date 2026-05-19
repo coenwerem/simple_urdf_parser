@@ -29,6 +29,7 @@ Dependencies are listed in `requirements.txt` and include:
 * `numpy`
 * `spatialmath-python`
 * `trimesh`
+* `viser` (optional — for visualization)
 
 ## Usage
 
@@ -104,12 +105,60 @@ q_rand = robot.Configuration.random_config(robot.actuated_joints, robot)
 print("Random configuration:", np.round(qrand.joint_values, 4))
 ```
 
-## Examples
+## Visualization
 
-Run the included demo:
+The library includes a [viser](https://viser.studio)-based 3D visualizer for interactive robot inspection and IK debugging.
+
+![IK convergence demo](assets/demo_ik.gif)
+
+<!-- TODO: replace with a screen-recorded video of the interactive viser demo -->
+
+### Quick Start
 
 ```bash
-python3 examples/demo_parse_urdf.py
+pip install viser trimesh
+python examples/demo_visualize.py
+# Open http://localhost:8080
+```
+
+### Basic Viewer with Joint Sliders
+
+```python
+from simple_urdf_parser import Robot
+from simple_urdf_parser.visualizer import RobotVisualizer
+
+robot = Robot(desc_fp="assets/urdf/ur3.urdf")
+viz = RobotVisualizer(robot, port=8080)
+
+viz.build_scene()
+viz.add_joint_sliders()
+viz.server.sleep_forever()
+```
+
+### Interactive IK
+
+Drag a 3D gizmo to set target poses — the robot solves IK and tracks in real time.
+
+```bash
+python examples/demo_ik_visualize.py --interactive
+```
+
+Or run the animated convergence mode with a ghost target:
+
+```bash
+python examples/demo_ik_visualize.py
+python examples/demo_ik_visualize.py --target_xyz 0.2 0.1 0.3
+```
+
+## Examples
+
+Run the included demos:
+
+```bash
+python3 examples/demo_parse_urdf.py          # parsing, FK, IK, Jacobian
+python3 examples/demo_visualize.py            # 3D viewer with joint sliders
+python3 examples/demo_ik_visualize.py          # animated IK convergence
+python3 examples/demo_ik_visualize.py --interactive  # draggable IK gizmo
 ```
 
 Sample output:
@@ -137,11 +186,12 @@ Random configuration: [-1.5766, 5.6638, 1.4577, 1.2398, -4.3226, -4.3229]
 
 ```
 simple_urdf_parser/
-├── assets/urdf/        # Sample URDF files
-├── examples/           # Example scripts demonstrating usage
-├── simple_urdf_parser/ # Main library module
-│   └── parser.py
-├── tests/              # Unit tests
+├── assets/urdf/            # Sample URDF files and meshes
+├── examples/               # Demo scripts (parsing, visualization, IK)
+├── simple_urdf_parser/     # Main library module
+│   ├── parser.py           # URDF parser, FK, IK, Jacobian
+│   └── visualizer.py       # Viser-based 3D visualization
+├── tests/                  # Unit tests
 ├── pyproject.toml
 ├── requirements.txt
 └── README.md
@@ -149,7 +199,8 @@ simple_urdf_parser/
 
 ## Notes
 
-* The current implementation uses proxy boxes for mesh geometry due to deprecation of PyCollada. Avoid using it for collision-sensitive computations that rely on meshes.
+* Mesh geometry (STL, DAE) is supported via `trimesh`. Visual origins from the URDF are applied correctly.
+* The visualizer requires `viser` and `trimesh` (optional dependencies — the parser works without them).
 * Designed for Python >= 3.9.
 * Intended as a lightweight utility for robotics projects, simulation, and education.
 
