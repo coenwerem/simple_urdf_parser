@@ -1,8 +1,7 @@
-"""Record an IK convergence run as a GIF using offscreen pyrender."""
+"""Record IK convergence GIFs using offscreen pyrender."""
 
 import sys
 import os
-import time
 
 os.environ["PYOPENGL_PLATFORM"] = "egl"
 
@@ -18,11 +17,16 @@ from simple_urdf_parser import Robot
 
 URDF_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "urdf", "ur3.urdf")
 URDF_DIR = os.path.dirname(os.path.abspath(URDF_PATH))
-OUT_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "demo_ik.gif")
+OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "assets")
 
 WIDTH, HEIGHT = 800, 600
-FPS = 20
-EVERY_N = 1
+FPS = 10
+
+TARGETS = {
+    "A": [1.0, -1.2, 1.5, -1.0, 0.8, 0.5],
+    "B": [-0.7, -0.9, 1.8, -0.4, -0.6, 0.3],
+    "C": [0.3, -1.5, 1.0, -1.2, 1.4, -0.8],
+}
 
 
 def load_link_mesh(link, urdf_dir):
@@ -119,6 +123,74 @@ def build_scene(robot, config, link_meshes, ghost_config=None):
     return scene
 
 
+def run_ik(robot, link_meshes, renderer, q_target, label):
+    target_pose = robot._compute_fk(
+        config=q_target,
+        start=robot.base_link._name,
+        end=robot.ee_link._name,
+        pretty_print=False,
+    )
+
+    config = Robot.Configuration.zeros_for_joints(robot.actuated_joints)
+    eps = 1e-4
+    gamma = 0.3
+    damp_factor = 0.01
+    max_iters = 300
+    frames = []
+    prev_err_norm = float("inf")
+    stall_count = 0
+
+    for i in range(max_iters):
+        ee_T = robot._compute_fk(
+            config=config,
+            start=robot.base_link._name,
+            end=robot.ee_link._name,
+            pretty_print=False,
+        )
+
+        pos_err = target_pose.t - ee_T.t
+        rot_err = Robot.compute_tsp_rot_error(target_pose, ee_T)
+        err = np.concatenate([pos_err, rot_err])
+        err_norm = np.linalg.norm(err)
+
+        scene = build_scene(robot, config, link_meshes, ghost_config=q_target)
+        color, _ = renderer.render(scene)
+        frames.append(color.copy())
+
+        if i % 5 == 0:
+            print(f"  [{label}] iter {i:3d}  err={err_norm:.5f}  frames={len(frames)}")
+
+        if err_norm < eps:
+            print(f"  [{label}] Converged at iteration {i}")
+            break
+
+        if abs(prev_err_norm - err_norm) < 1e-6:
+            stall_count += 1
+            if stall_count > 10:
+                print(f"  [{label}] Stalled at iteration {i}")
+                break
+        else:
+            stall_count = 0
+        prev_err_norm = err_norm
+
+        J = robot._compute_jacobian(config=config)
+        dq = J.T @ np.linalg.solve(J @ J.T + damp_factor**2 * np.eye(6), err)
+        new_vals = np.array(config.joint_values) + gamma * dq
+        config = Robot.Configuration(
+            joints=robot.actuated_joints,
+            joint_values=new_vals.tolist(),
+        )
+        config = Robot.clamp_limits(config)
+
+    # Hold final pose
+    scene = build_scene(robot, config, link_meshes, ghost_config=q_target)
+    color, _ = renderer.render(scene)
+    for _ in range(15):
+        frames.append(color.copy())
+
+    return frames
+
+
 print("Loading robot and meshes ...")
 robot = Robot(desc_fp=URDF_PATH)
 
@@ -127,86 +199,22 @@ for link in robot.links:
     try:
         robot._get_joint_to_parent(link._name)
     except ValueError:
-        mesh, origin = load_link_mesh(link, URDF_DIR)
-        link_meshes[link._name] = (mesh, origin if origin is not None else np.eye(4))
-        continue
+        pass
     mesh, origin = load_link_mesh(link, URDF_DIR)
     link_meshes[link._name] = (mesh, origin if origin is not None else np.eye(4))
 
 renderer = pyrender.OffscreenRenderer(WIDTH, HEIGHT)
 
-q_target = Robot.Configuration(
-    joints=robot.actuated_joints,
-    joint_values=[1.0, -1.2, 1.5, -1.0, 0.8, 0.5],
-)
-target_pose = robot._compute_fk(
-    config=q_target,
-    start=robot.base_link._name,
-    end=robot.ee_link._name,
-    pretty_print=False,
-)
-
-init_config = Robot.Configuration.zeros_for_joints(robot.actuated_joints)
-config = init_config.copy()
-eps = 1e-4
-gamma = 0.3
-damp_factor = 0.01
-max_iters = 300
-frames = []
-prev_err_norm = float("inf")
-stall_count = 0
-
-print("Running IK and capturing frames ...")
-
-for i in range(max_iters):
-    ee_T = robot._compute_fk(
-        config=config,
-        start=robot.base_link._name,
-        end=robot.ee_link._name,
-        pretty_print=False,
-    )
-
-    pos_err = target_pose.t - ee_T.t
-    rot_err = Robot.compute_tsp_rot_error(target_pose, ee_T)
-    err = np.concatenate([pos_err, rot_err])
-    err_norm = np.linalg.norm(err)
-
-    if i % EVERY_N == 0:
-        scene = build_scene(robot, config, link_meshes, ghost_config=q_target)
-        color, _ = renderer.render(scene)
-        frames.append(color.copy())
-        print(f"  iter {i:3d}  err={err_norm:.5f}  frames={len(frames)}")
-
-    if err_norm < eps:
-        print(f"Converged at iteration {i}")
-        break
-
-    if abs(prev_err_norm - err_norm) < 1e-6:
-        stall_count += 1
-        if stall_count > 10:
-            print(f"Stalled at iteration {i}, stopping early")
-            break
-    else:
-        stall_count = 0
-    prev_err_norm = err_norm
-
-    J = robot._compute_jacobian(config=config)
-    dq = J.T @ np.linalg.solve(J @ J.T + damp_factor**2 * np.eye(6), err)
-    new_vals = np.array(config.joint_values) + gamma * dq
-    config = Robot.Configuration(
+for label, joint_vals in TARGETS.items():
+    print(f"\n--- Target {label} ---")
+    q_target = Robot.Configuration(
         joints=robot.actuated_joints,
-        joint_values=new_vals.tolist(),
+        joint_values=joint_vals,
     )
-    config = Robot.clamp_limits(config)
-
-# Hold final pose
-scene = build_scene(robot, config, link_meshes, ghost_config=q_target)
-color, _ = renderer.render(scene)
-for _ in range(10):
-    frames.append(color.copy())
+    frames = run_ik(robot, link_meshes, renderer, q_target, label)
+    out_path = os.path.join(OUT_DIR, f"demo_ik_{label}.gif")
+    print(f"  {len(frames)} frames -> {out_path}")
+    iio.imwrite(out_path, frames, duration=1000 // FPS, loop=0)
 
 renderer.delete()
-
-print(f"Captured {len(frames)} frames. Encoding GIF ...")
-iio.imwrite(OUT_PATH, frames, duration=1000 // FPS, loop=0)
-print(f"Saved to {OUT_PATH}")
+print("\nDone.")
